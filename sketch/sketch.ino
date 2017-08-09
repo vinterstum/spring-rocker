@@ -35,14 +35,19 @@ const int still_time_after_sleep_before_sleep = 1000;
 const int sleep_secs = 1;
 const bool sleep_mode_enabled = false;
 
+bool has_connected_wifi = false;
+
 #define LED_PIN 5
 bool blinkState = false;
+
+const char* host = "192.168.86.198";
 
 void setup() 
 {
   initHardware(); // Setup input/output I/O pins
-  //connectWiFi(); // Connect to WiFi
   initMTU();
+  connectWiFi();
+
   digitalWrite(LED_PIN, LOW); // LED on to indicate connect success
 }
 
@@ -92,6 +97,7 @@ void connectWiFi()
   Serial.println("WiFi connected");  
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
+  has_connected_wifi = true;   
 }
 
 
@@ -118,6 +124,33 @@ void initMTU() {
     Serial.println("MPU6050 connection successful");
 }
 
+void contactServer() {
+  if (!has_connected_wifi) {
+    connectWiFi(); // Connect to WiFi
+  }
+
+  WiFiClient client;
+  const int httpPort = 8000;
+  if (!client.connect(host, httpPort)) {
+    Serial.println("connection failed");
+    return;
+  }
+  
+  // This will send the request to the server
+  client.print(String("GET /dweet/for/myesp8266?message=lowpower") + " HTTP/1.1\r\n" +
+               "Host: " + host + "\r\n" + 
+               "Connection: close\r\n\r\n");
+  delay(10);
+  
+  // Read all the lines of the reply from server and print them to Serial
+  while(client.available()){
+    String line = client.readStringUntil('\r');
+    Serial.print(line);
+  }
+  
+  Serial.println();
+  Serial.println("closing connection");
+}
 
 void loop() {
   //Serial.println("Loop!");
@@ -146,6 +179,7 @@ void loop() {
       Serial.print(" MOVEMENT! ");
       time_since_movement = 0;
       has_had_movement = true;
+      contactServer();
     }
 
     Serial.println("");
