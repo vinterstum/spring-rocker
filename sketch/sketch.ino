@@ -28,10 +28,14 @@ int sample_rate = 100;
 int movement_threshold = 5000;
 int time_since_startup = 0;
 int time_since_movement = 0;
+int time_with_continuous_movement = 0;
+
 bool has_had_movement = false;
 
 const int still_time_before_sleep = 10000;
 const int still_time_after_sleep_before_sleep = 1000;
+const int continuous_movement_before_ping = 15000;
+
 const int sleep_secs = 1;
 const bool sleep_mode_enabled = false;
 
@@ -177,11 +181,31 @@ void loop() {
 
     if (delta > movement_threshold) {
       Serial.print(" MOVEMENT! ");
+      if (time_since_movement == sample_rate) {
+        time_with_continuous_movement += sample_rate;
+        Serial.print(time_with_continuous_movement); Serial.print("\t");
+      }
+
       time_since_movement = 0;
       has_had_movement = true;
-      contactServer();
+
+      // blink LED to indicate activity
+      blinkState = !blinkState;
+      digitalWrite(LED_PIN, blinkState);
+
+      if (time_with_continuous_movement > continuous_movement_before_ping) {
+        digitalWrite(LED_PIN, false);
+        time_with_continuous_movement = 0;
+        contactServer();
+      }
+    } else {
+      digitalWrite(LED_PIN, true);
     }
 
+    if (time_since_movement > 1000) {
+      Serial.print("MOVEMENT TIMEOUT!"); Serial.print("\t");
+      time_with_continuous_movement = 0;
+    }
     Serial.println("");
       
 //        Serial.print(ax); Serial.print("\t");
@@ -196,7 +220,4 @@ void loop() {
     ESP.deepSleep(sleep_secs * 1000000);    
   }
   
-    // blink LED to indicate activity
-    blinkState = !blinkState;
-    digitalWrite(LED_PIN, blinkState);
 }
