@@ -10,42 +10,48 @@
     #include "Wire.h"
 #endif
 
-MPU6050 accelgyro;
-
-int16_t ax, ay, az;
-int16_t gx, gy, gz;
-int16_t prev_gx, prev_gy, prev_gz;
-bool have_prev = false;
-
-
-const char WiFiSSID[] = "geheb";
-const char WiFiPSK[] = "kaffe2go";
-
-const unsigned long postRate = 60000;
-unsigned long lastPost = 0;
-
-int sample_rate = 100;
-int movement_threshold = 5000;
-int time_since_startup = 0;
-int time_since_movement = 0;
-int time_with_continuous_movement = 0;
-
-bool has_had_movement = false;
-
-const int still_time_before_sleep = 10000;
-const int still_time_after_sleep_before_sleep = 1000;
-const int continuous_movement_before_ping = 15000;
-
-const int sleep_secs = 1;
-const bool sleep_mode_enabled = false;
-
-bool has_connected_wifi = false;
 
 #define LED_PIN 5
-bool blinkState = false;
 
-const char* host = "192.168.86.198";
+const char WiFiSSID[] = "led_dinosaur_poofer";
+const char WiFiPSK[] = "poof4dino";
 
+const int STILL_TIME_BEFORE_SLEEP = 10000;
+const int STILL_TIME_AFTER_SLEEP_BEFORE_SLEEP = 1000;
+const int CONTINUOUS_MOVEMENT_BEFORE_PING = 15000;
+
+const int COOLDOWN_TIME = 45000;
+const int COOLDOWN_BLINK_RATE = 500;
+
+const int SLEEP_SECS = 1;
+const bool SLEEP_MODE_ENABLED = false;
+
+const int SAMPLE_RATE = 100;
+const int MOVEMENT_THRESHOLD = 5000;
+
+const char* HOSTNAME = "thing.local";
+const int HTTP_PORT = 80;
+
+
+
+MPU6050 accelgy_ro_;
+
+int time_since_startup_ = 0;
+int time_since_movement_ = 0;
+int time_with_continuous_movement_ = 0;
+
+bool has_had_movement_ = false;
+
+int16_t ax_, ay_, az_;
+int16_t gx_, gy_, gz_;
+int16_t prev_gx_, prev_gy_, prev_gz_;
+bool have_prev_ = false;
+
+bool has_connected_wifi_ = false;
+
+bool blink_state_ = false;
+
+  
 void setup() 
 {
   initHardware(); // Setup input/output I/O pins
@@ -57,11 +63,8 @@ void setup()
 
 void initHardware() {
     // initialize serial communication
-    // (38400 chosen because it works as well at 8MHz as it does at 16MHz, but
-    // it's really up to you depending on your project)
-
     Serial.begin(9600);
-    while (!Serial); // wait for Leonardo enumeration, others continue immediately
+    while (!Serial);
 
     pinMode(LED_PIN, OUTPUT); // Set LED as output
     digitalWrite(LED_PIN, HIGH); // LED off
@@ -74,34 +77,22 @@ void connectWiFi()
   byte ledStatus = LOW;
   Serial.println();
   Serial.println("Connecting to: " + String(WiFiSSID));
-  // Set WiFi mode to station (as opposed to AP or AP_STA)
+
   WiFi.mode(WIFI_STA);
 
-  // WiFI.begin([ssid], [passkey]) initiates a WiFI connection
-  // to the stated [ssid], using the [passkey] as a WPA, WPA2,
-  // or WEP passphrase.
   WiFi.begin(WiFiSSID, WiFiPSK);
 
-  // Use the WiFi.status() function to check if the ESP8266
-  // is connected to a WiFi network.
   while (WiFi.status() != WL_CONNECTED)
   {
-    // Blink the LED
     digitalWrite(LED_PIN, ledStatus); // Write LED high/low
     ledStatus = (ledStatus == HIGH) ? LOW : HIGH;
 
-    // Delays allow the ESP8266 to perform critical tasks
-    // defined outside of the sketch. These tasks include
-    // setting up, and maintaining, a WiFi connection.
     delay(100);
-    // Potentially infinite loops are generally dangerous.
-    // Add delays -- allowing the processor to perform other
-    // tasks -- wherever possible.
   }
   Serial.println("WiFi connected");  
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
-  has_connected_wifi = true;   
+  has_connected_wifi_ = true;   
 }
 
 
@@ -117,11 +108,11 @@ void initMTU() {
 
     // initialize device
     Serial.println("Initializing I2C devices...");
-    accelgyro.initialize();
+    accelgy_ro_.initialize();
 
     // verify connection
     Serial.println("Testing device connections...");
-    while( !accelgyro.testConnection() ) {
+    while( !accelgy_ro_.testConnection() ) {
       Serial.println("MPU6050 connection failed.");
       delay(100);
     }
@@ -129,20 +120,19 @@ void initMTU() {
 }
 
 void contactServer() {
-  if (!has_connected_wifi) {
+  if (!has_connected_wifi_) {
     connectWiFi(); // Connect to WiFi
   }
 
   WiFiClient client;
-  const int httpPort = 8000;
-  if (!client.connect(host, httpPort)) {
+  if (!client.connect(HOSTNAME, HTTP_PORT)) {
     Serial.println("connection failed");
     return;
   }
   
   // This will send the request to the server
-  client.print(String("GET /dweet/for/myesp8266?message=lowpower") + " HTTP/1.1\r\n" +
-               "Host: " + host + "\r\n" + 
+  client.print(String("GET /poof") + " HTTP/1.1\r\n" +
+               "Host: " + HOSTNAME + "\r\n" + 
                "Connection: close\r\n\r\n");
   delay(10);
   
@@ -157,67 +147,76 @@ void contactServer() {
 }
 
 void loop() {
-  //Serial.println("Loop!");
-  delay(sample_rate);
-  time_since_startup += sample_rate;
-  time_since_movement += sample_rate;
+  delay(SAMPLE_RATE);
+  time_since_startup_ += SAMPLE_RATE;
+  time_since_movement_ += SAMPLE_RATE;
   
-    // read raw accel/gyro measurements from device
-    accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-    if (!have_prev) {
-      prev_gx = gx;
-      prev_gy = gy;
-      prev_gz = gz;
-      have_prev = true;
+    // read raw accel/gy_ro measurements from device
+    accelgy_ro_.getMotion6(&ax_, &ay_, &az_, &gx_, &gy_, &gz_);
+    if (!have_prev_) {
+      prev_gx_ = gx_;
+      prev_gy_ = gy_;
+      prev_gz_ = gz_;
+      have_prev_ = true;
       return;
     }
     
-    int delta = abs((gx - prev_gx) + (gy - prev_gy) + (gz - prev_gz));
+    int delta = abs((gx_ - prev_gx_) + (gy_ - prev_gy_) + (gz_ - prev_gz_));
 
-    // display tab-separated accel/gyro x/y/z values
+    // display_ tab-separated accel/gy_ro x/y/z values
     //Serial.print("a/g:\t");
-    Serial.print("Delta: " );
-    Serial.print(delta); Serial.print("\t");
+//    Serial.print("Delta: " );
+//    Serial.print(delta); Serial.print("\t");
 
-    if (delta > movement_threshold) {
+    if (delta > MOVEMENT_THRESHOLD) {
       Serial.print(" MOVEMENT! ");
-      if (time_since_movement == sample_rate) {
-        time_with_continuous_movement += sample_rate;
-        Serial.print(time_with_continuous_movement); Serial.print("\t");
+      if (time_since_movement_ == SAMPLE_RATE) {
+        time_with_continuous_movement_ += SAMPLE_RATE;
+        Serial.print(time_with_continuous_movement_); Serial.println("\t");
       }
 
-      time_since_movement = 0;
-      has_had_movement = true;
+      time_since_movement_ = 0;
+      has_had_movement_ = true;
 
       // blink LED to indicate activity
-      blinkState = !blinkState;
-      digitalWrite(LED_PIN, blinkState);
+      blink_state_ = !blink_state_;
+      digitalWrite(LED_PIN, blink_state_);
 
-      if (time_with_continuous_movement > continuous_movement_before_ping) {
+      if (time_with_continuous_movement_ > CONTINUOUS_MOVEMENT_BEFORE_PING) {
         digitalWrite(LED_PIN, false);
-        time_with_continuous_movement = 0;
+        time_with_continuous_movement_ = 0;
         contactServer();
+
+        int slept = 0;
+        while (slept < COOLDOWN_TIME) {
+          delay(COOLDOWN_BLINK_RATE);
+          slept += COOLDOWN_BLINK_RATE;
+          digitalWrite(LED_PIN, blink_state_);
+          blink_state_ = !blink_state_;
+        }
+        digitalWrite(LED_PIN, LOW);
       }
     } else {
       digitalWrite(LED_PIN, true);
     }
 
-    if (time_since_movement > 1000) {
+    if (time_since_movement_ > 1000 && time_with_continuous_movement_ > 0) {
       Serial.print("MOVEMENT TIMEOUT!"); Serial.print("\t");
-      time_with_continuous_movement = 0;
+      time_with_continuous_movement_ = 0;
+      Serial.println("");
     }
-    Serial.println("");
+    //Serial.println("");
       
-//        Serial.print(ax); Serial.print("\t");
-//        Serial.print(ay); Serial.print("\t");
-//        Serial.print(az); Serial.print("\t");
-//        Serial.print(gx); Serial.print("\t");
-//        Serial.print(gy); Serial.print("\t");
-//        Serial.print(gz); Serial.print("\t");
-  if (sleep_mode_enabled && ((time_since_movement > still_time_before_sleep) ||
-    (!has_had_movement && time_since_startup > still_time_after_sleep_before_sleep))) {
+//        Serial.print(ax_); Serial.print("\t");
+//        Serial.print(ay_); Serial.print("\t");
+//        Serial.print(az_); Serial.print("\t");
+//        Serial.print(gx_); Serial.print("\t");
+//        Serial.print(gy_); Serial.print("\t");
+//        Serial.print(gz_); Serial.print("\t");
+  if (SLEEP_MODE_ENABLED && ((time_since_movement_ > STILL_TIME_BEFORE_SLEEP) ||
+    (!has_had_movement_ && time_since_startup_ > STILL_TIME_AFTER_SLEEP_BEFORE_SLEEP))) {
     Serial.println("ESP8266 in sleep mode");
-    ESP.deepSleep(sleep_secs * 1000000);    
+    ESP.deepSleep(SLEEP_SECS * 1000000);    
   }
   
 }
