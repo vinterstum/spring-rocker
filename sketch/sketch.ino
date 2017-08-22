@@ -29,7 +29,7 @@ const bool SLEEP_MODE_ENABLED = false;
 const int SAMPLE_RATE = 100;
 const int MOVEMENT_THRESHOLD = 5000;
 
-const char* HOSTNAME = "thing.local";
+const char* HOSTNAME = "192.168.4.1";
 const int HTTP_PORT = 80;
 
 
@@ -151,61 +151,61 @@ void loop() {
   time_since_startup_ += SAMPLE_RATE;
   time_since_movement_ += SAMPLE_RATE;
   
-    // read raw accel/gy_ro measurements from device
-    accelgy_ro_.getMotion6(&ax_, &ay_, &az_, &gx_, &gy_, &gz_);
-    if (!have_prev_) {
-      prev_gx_ = gx_;
-      prev_gy_ = gy_;
-      prev_gz_ = gz_;
-      have_prev_ = true;
-      return;
-    }
-    
-    int delta = abs((gx_ - prev_gx_) + (gy_ - prev_gy_) + (gz_ - prev_gz_));
+  // read raw accel/gy_ro measurements from device
+  accelgy_ro_.getMotion6(&ax_, &ay_, &az_, &gx_, &gy_, &gz_);
+  if (!have_prev_) {
+    prev_gx_ = gx_;
+    prev_gy_ = gy_;
+    prev_gz_ = gz_;
+    have_prev_ = true;
+    return;
+  }
+  
+  int delta = abs((gx_ - prev_gx_) + (gy_ - prev_gy_) + (gz_ - prev_gz_));
 
     // display_ tab-separated accel/gy_ro x/y/z values
     //Serial.print("a/g:\t");
 //    Serial.print("Delta: " );
 //    Serial.print(delta); Serial.print("\t");
 
-    if (delta > MOVEMENT_THRESHOLD) {
-      Serial.print(" MOVEMENT! ");
-      if (time_since_movement_ == SAMPLE_RATE) {
-        time_with_continuous_movement_ += SAMPLE_RATE;
-        Serial.print(time_with_continuous_movement_); Serial.println("\t");
-      }
-
-      time_since_movement_ = 0;
-      has_had_movement_ = true;
-
-      // blink LED to indicate activity
-      blink_state_ = !blink_state_;
-      digitalWrite(LED_PIN, blink_state_);
-
-      if (time_with_continuous_movement_ > CONTINUOUS_MOVEMENT_BEFORE_PING) {
-        digitalWrite(LED_PIN, false);
-        time_with_continuous_movement_ = 0;
-        contactServer();
-
-        int slept = 0;
-        while (slept < COOLDOWN_TIME) {
-          delay(COOLDOWN_BLINK_RATE);
-          slept += COOLDOWN_BLINK_RATE;
-          digitalWrite(LED_PIN, blink_state_);
-          blink_state_ = !blink_state_;
-        }
-        digitalWrite(LED_PIN, LOW);
-      }
-    } else {
-      digitalWrite(LED_PIN, true);
+  if (delta > MOVEMENT_THRESHOLD) {
+    Serial.print(" MOVEMENT! ");
+    if (time_since_movement_ == SAMPLE_RATE) {
+      time_with_continuous_movement_ += SAMPLE_RATE;
+      Serial.print(time_with_continuous_movement_); Serial.println("\t");
     }
 
-    if (time_since_movement_ > 1000 && time_with_continuous_movement_ > 0) {
-      Serial.print("MOVEMENT TIMEOUT!"); Serial.print("\t");
+    time_since_movement_ = 0;
+    has_had_movement_ = true;
+
+    // blink LED to indicate activity
+    blink_state_ = !blink_state_;
+    digitalWrite(LED_PIN, blink_state_);
+
+    if (time_with_continuous_movement_ > CONTINUOUS_MOVEMENT_BEFORE_PING) {
+      digitalWrite(LED_PIN, false);
       time_with_continuous_movement_ = 0;
-      Serial.println("");
+      contactServer();
+
+      int slept = 0;
+      while (slept < COOLDOWN_TIME) {
+        delay(COOLDOWN_BLINK_RATE);
+        slept += COOLDOWN_BLINK_RATE;
+        digitalWrite(LED_PIN, blink_state_);
+        blink_state_ = !blink_state_;
+      }
+      digitalWrite(LED_PIN, LOW);
     }
-    //Serial.println("");
+  } else {
+    digitalWrite(LED_PIN, true);
+  }
+
+  if (time_since_movement_ > 1000 && time_with_continuous_movement_ > 0) {
+    Serial.print("MOVEMENT TIMEOUT!"); Serial.print("\t");
+    time_with_continuous_movement_ = 0;
+    Serial.println("");
+  }
+  //Serial.println("");
       
 //        Serial.print(ax_); Serial.print("\t");
 //        Serial.print(ay_); Serial.print("\t");
@@ -213,6 +213,7 @@ void loop() {
 //        Serial.print(gx_); Serial.print("\t");
 //        Serial.print(gy_); Serial.print("\t");
 //        Serial.print(gz_); Serial.print("\t");
+
   if (SLEEP_MODE_ENABLED && ((time_since_movement_ > STILL_TIME_BEFORE_SLEEP) ||
     (!has_had_movement_ && time_since_startup_ > STILL_TIME_AFTER_SLEEP_BEFORE_SLEEP))) {
     Serial.println("ESP8266 in sleep mode");
